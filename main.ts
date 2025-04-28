@@ -25,6 +25,8 @@ const DEFAULT_SETTINGS: GlimtPluginSettings = {
 
 const API_URL = "http://localhost:3000";
 
+const FOLDER = "glimt";
+
 export default class MyPlugin extends Plugin {
 	settings: GlimtPluginSettings;
 
@@ -37,8 +39,7 @@ export default class MyPlugin extends Plugin {
 			"sparkles",
 			"Sample Plugin",
 			(evt: MouseEvent) => {
-				// Called when the user clicks the icon.
-				new Notice("Syncing Glimts");
+				this.syncBackend();
 			}
 		);
 		// Perform additional things with the ribbon
@@ -117,6 +118,7 @@ export default class MyPlugin extends Plugin {
 
 	async syncBackend({ force }: { force: boolean } = { force: false }) {
 		const apiKey = this.settings.apiKey;
+
 		if (!apiKey) {
 			new Notice("Please set your secret key in the settings.");
 			return;
@@ -124,23 +126,20 @@ export default class MyPlugin extends Plugin {
 
 		new Notice("Syncing Glimts");
 
-		const response = await fetch(
-			`${API_URL}/api/integrations/obsidian/glimt?cursor=${
-				force ? 0 : this.settings.cursor
-			}`,
-			{
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `${apiKey}`,
-				},
+		const batchSize = 50;
+		const startCursor = force ? 0 : this.settings.cursor;
+
+		let index = 0;
+
+		while (true) {
+			const glimts = await this.fetchGlimts({
+				cursor: index === 0 ? startCursor : this.settings.cursor,
+				limit: batchSize,
+			});
+
+			if (!glimts || glimts.length === 0) {
+				break;
 			}
-		);
-
-		if (response.ok) {
-			const data = (await response.json()) as PodcastGlimt[];
-
-			const FOLDER = "glimt";
 
 			let folder = this.app.vault.getAbstractFileByPath(FOLDER);
 
@@ -148,9 +147,7 @@ export default class MyPlugin extends Plugin {
 				await this.app.vault.createFolder(FOLDER);
 			}
 
-			console.log(`syncing ${data.length} glimts`);
-
-			for (const glimt of data) {
+			for (const glimt of glimts) {
 				const filePath = `${FOLDER}/${glimt.title?.replace(
 					/\:/g,
 					""
@@ -166,20 +163,24 @@ export default class MyPlugin extends Plugin {
 				}
 			}
 
-			const newCursor = data.reduce((cursor, item) => {
-				if (item.id > cursor) {
-					return item.id;
-				}
-				return cursor;
-			}, this.settings.cursor);
+			const newCursor = glimts
+				.map((glimt) => glimt.id)
+				.sort((a, b) => b - a)[0];
 
-			this.settings.cursor = newCursor;
-			await this.saveSettings();
+			if (newCursor === undefined) {
+				break;
+			}
 
-			new Notice("Glimts synced successfully!");
-		} else {
-			new Notice("Failed to sync Glimts.");
+			if (newCursor) {
+				this.settings.cursor = newCursor;
+			}
+
+			index++;
 		}
+
+		await this.saveSettings();
+
+		new Notice("Glimts synced!");
 	}
 
 	onunload() {}
@@ -194,6 +195,25 @@ export default class MyPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	async fetchGlimts({ cursor, limit }: { cursor: number; limit: number }) {
+		const response = await fetch(
+			`${API_URL}/api/integrations/obsidian/glimt?cursor=${cursor}&limit=${limit}`,
+			{
+				method: "GET",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `${this.settings.apiKey}`,
+				},
+			}
+		);
+
+		if (response.ok) {
+			return (await response.json()) as PodcastGlimt[];
+		} else {
+			throw new Error("Failed to fetch Glimts");
+		}
 	}
 }
 
@@ -248,7 +268,7 @@ class SampleSettingTab extends PluginSettingTab {
 			)
 			.addButton((button) => {
 				button
-					.setButtonText("Sync Glimts")
+					.setButtonText("Force Sync")
 					.setCta()
 
 					.onClick(async () => {
