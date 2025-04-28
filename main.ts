@@ -1,5 +1,6 @@
 import {
 	App,
+	ButtonComponent,
 	Editor,
 	MarkdownView,
 	Modal,
@@ -14,10 +15,12 @@ import { PodcastGlimt } from "types";
 
 interface GlimtPluginSettings {
 	apiKey: string;
+	cursor: number;
 }
 
 const DEFAULT_SETTINGS: GlimtPluginSettings = {
 	apiKey: "",
+	cursor: 0,
 };
 
 const API_URL = "http://localhost:3000";
@@ -42,14 +45,28 @@ export default class MyPlugin extends Plugin {
 		ribbonIconEl.addClass("my-plugin-ribbon-class");
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText("Status Bar Text");
+		// const statusBarItemEl = this.addStatusBarItem();
+		// statusBarItemEl.setText("Status Bar Text");
 
 		this.addCommand({
 			id: "sync-glimts",
 			name: "Sync Glimt Bookmarks",
 			callback: async () => {
 				await this.syncBackend();
+			},
+		});
+
+		this.addCommand({
+			id: "sync-glimts-force",
+			name: "Force - Sync Glimt Bookmarks",
+			callback: async () => {
+				if (
+					confirm(
+						"Are you sure you want to sync all Glimts? This will overwrite existing files with the same name."
+					)
+				) {
+					await this.syncBackend({ force: true });
+				}
 			},
 		});
 
@@ -88,9 +105,9 @@ export default class MyPlugin extends Plugin {
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, "click", (evt: MouseEvent) => {
-			console.log("click", evt);
-		});
+		// this.registerDomEvent(document, "click", (evt: MouseEvent) => {
+		// 	console.log("click", evt);
+		// });
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
 		this.registerInterval(
@@ -98,7 +115,7 @@ export default class MyPlugin extends Plugin {
 		);
 	}
 
-	async syncBackend() {
+	async syncBackend({ force }: { force: boolean } = { force: false }) {
 		const apiKey = this.settings.apiKey;
 		if (!apiKey) {
 			new Notice("Please set your secret key in the settings.");
@@ -108,7 +125,9 @@ export default class MyPlugin extends Plugin {
 		new Notice("Syncing Glimts");
 
 		const response = await fetch(
-			`${API_URL}/api/integrations/obsidian/glimt`,
+			`${API_URL}/api/integrations/obsidian/glimt?cursor=${
+				force ? 0 : this.settings.cursor
+			}`,
 			{
 				method: "GET",
 				headers: {
@@ -129,18 +148,33 @@ export default class MyPlugin extends Plugin {
 				await this.app.vault.createFolder(FOLDER);
 			}
 
+			console.log(`syncing ${data.length} glimts`);
+
 			for (const glimt of data) {
-				const filePath = `${FOLDER}/${glimt.title} [${glimt.id}].md`;
+				const filePath = `${FOLDER}/${glimt.title?.replace(
+					/\:/g,
+					""
+				)} [${glimt.id}].md`;
 				const content = formatGlimtToMarkdown(glimt);
 
 				let file = this.app.vault.getAbstractFileByPath(filePath);
 
-				if (file) {
+				if (file && force) {
 					await this.app.vault.modify(file as any, content);
-				} else {
+				} else if (!file) {
 					await this.app.vault.create(filePath, content);
 				}
 			}
+
+			const newCursor = data.reduce((cursor, item) => {
+				if (item.id > cursor) {
+					return item.id;
+				}
+				return cursor;
+			}, this.settings.cursor);
+
+			this.settings.cursor = newCursor;
+			await this.saveSettings();
 
 			new Notice("Glimts synced successfully!");
 		} else {
@@ -206,6 +240,27 @@ class SampleSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Force Sync Glimts")
+			.setDesc(
+				"Resync all Glimts. Will overwrite existing files with the same name."
+			)
+			.addButton((button) => {
+				button
+					.setButtonText("Sync Glimts")
+					.setCta()
+
+					.onClick(async () => {
+						if (
+							confirm(
+								"Are you sure you want to sync all Glimts? This will overwrite existing files with the same name."
+							)
+						) {
+							await this.plugin.syncBackend({ force: true });
+						}
+					});
+			});
 	}
 }
 
@@ -222,6 +277,9 @@ const formatGlimtToMarkdown = (glimt: PodcastGlimt) => {
 		`> ${glimt.transcript} \n\n` +
 		`**${glimt.podcast_name}: ${glimt.podcast_episode_name}** \n` +
 		`	*at: ${formatTimeStampFromSeconds(glimt.timestamp ?? 0)}* \n\n` +
+		`#${cleanTag(glimt.podcast_name ?? "")} #${cleanTag(
+			glimt.podcast_episode_name ?? ""
+		)} \n\n` +
 		`[${API_URL}/glimt/${glimt.id}](${API_URL}/glimt/${glimt.id})`
 	);
 };
@@ -237,4 +295,12 @@ export const formatTimeStampFromSeconds = (seconds: number) => {
 
 export const zeroPad = (num: number) => {
 	return num.toString().padStart(2, "0");
+};
+
+const cleanTag = (tag: string) => {
+	return tag
+		.replace(/[^a-zA-Z0-9]/g, "")
+		.replace(/([A-Z])/g, "_$1")
+		.replace(/^_/, "")
+		.toLowerCase();
 };
