@@ -300,7 +300,8 @@ const formatGlimtToMarkdown = (glimt: PodcastGlimt) => {
 		`#${cleanTag(glimt.podcast_name ?? "")} #${cleanTag(
 			glimt.podcast_episode_name ?? ""
 		)} \n\n` +
-		`[${API_URL}/glimt/${glimt.id}](${API_URL}/glimt/${glimt.id})`
+		`[${API_URL}/glimt/${glimt.id}](${API_URL}/glimt/${glimt.id})\n\n\n\n` +
+		`**Warning:** *These documents should be considered __read only__ as syncing might overwrite them. Please copy them to another folder if you want to make edits.* \n\n`
 	);
 };
 
