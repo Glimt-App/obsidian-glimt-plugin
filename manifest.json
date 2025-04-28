@@ -1,11 +1,12 @@
 {
 	"id": "@glimtapp/obsidian-plugin",
-	"name": "Glimt App",
+	"name": "Glimt App Plugin",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Sync your podcast bookmarks and insights from the Glimt app to your Obsidian vault.",
+	"author": "@yornaath",
+	"repo": "Glimt-App/obsidian-glimt-plugin",
+	"authorUrl": "https://www.glimtapp.io/",
+	"fundingUrl": "https://www.glimtapp.io/#pricing",
 	"isDesktopOnly": false
 }
