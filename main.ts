@@ -285,7 +285,7 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		const s = new Setting(containerEl)
+		const secretSetting = new Setting(containerEl)
 			.setName("Secret Key")
 			.setDesc("Login to Glimt and get your secret key. ")
 			.addText((text) =>
@@ -315,8 +315,8 @@ class SampleSettingTab extends PluginSettingTab {
 		const br = document.createElement("br");
 		a.href = "https://app.glimtapp.io/integrations";
 		a.textContent = "glimtapp.io -> Integrations -> Obsidian Plugins";
-		s.descEl.appendChild(br);
-		s.descEl.appendChild(a);
+		secretSetting.descEl.appendChild(br);
+		secretSetting.descEl.appendChild(a);
 
 		new Setting(containerEl)
 			.setName("Sync Folder")
