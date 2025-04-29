@@ -1,12 +1,16 @@
+import { GLIMT_ICON } from "icons";
 import {
+	addIcon,
 	App,
 	ButtonComponent,
 	Editor,
+	IconName,
 	MarkdownView,
 	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
+	setIcon,
 	Setting,
 } from "obsidian";
 import { PodcastGlimt } from "types";
@@ -14,40 +18,41 @@ import { PodcastGlimt } from "types";
 // Remember to rename these classes and interfaces!
 
 interface GlimtPluginSettings {
-	apiKey: string;
+	folder: string;
+	token: string;
 	cursor: number;
 }
 
 const DEFAULT_SETTINGS: GlimtPluginSettings = {
-	apiKey: "",
+	folder: "Glimt",
+	token: "",
 	cursor: 0,
 };
 
 const API_URL = "http://localhost:3000";
 
-const FOLDER = "glimt";
-
 export default class MyPlugin extends Plugin {
 	settings: GlimtPluginSettings;
 
+	statusBarItemEl: HTMLElement;
+
 	async onload() {
-		await this.loadSettings();
-		this.syncBackend();
+		addIcon("glimt-icon", GLIMT_ICON);
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon(
-			"sparkles",
-			"Sample Plugin",
+			"glimt-icon",
+			"Glimt Sync",
 			(evt: MouseEvent) => {
 				this.syncBackend();
 			}
 		);
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass("my-plugin-ribbon-class");
+
+		await this.loadSettings();
+		this.syncBackend();
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		// const statusBarItemEl = this.addStatusBarItem();
-		// statusBarItemEl.setText("Status Bar Text");
+		this.statusBarItemEl = this.addStatusBarItem();
 
 		this.addCommand({
 			id: "sync-glimts",
@@ -117,14 +122,18 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async syncBackend({ force }: { force: boolean } = { force: false }) {
-		const apiKey = this.settings.apiKey;
+		const apiKey = this.settings.token;
 
 		if (!apiKey) {
-			new Notice("Please set your secret key in the settings.");
+			new WarnNotice(
+				"Glimt: please set your secret key in the settings.",
+				"file-warning",
+				10_000
+			);
 			return;
 		}
 
-		new Notice("Syncing Glimts");
+		const isSyncingMessage = new Notice("Syncing Glimts");
 
 		const batchSize = 50;
 		const startCursor = force ? 0 : this.settings.cursor;
@@ -141,17 +150,23 @@ export default class MyPlugin extends Plugin {
 				break;
 			}
 
-			let folder = this.app.vault.getAbstractFileByPath(FOLDER);
+			let folder = this.app.vault.getAbstractFileByPath(
+				this.settings.folder
+			);
+
+			if (force && folder) {
+				await this.app.vault.delete(folder, force);
+				folder = null;
+			}
 
 			if (!folder) {
-				await this.app.vault.createFolder(FOLDER);
+				await this.app.vault.createFolder(this.settings.folder);
 			}
 
 			for (const glimt of glimts) {
-				const filePath = `${FOLDER}/${glimt.title?.replace(
-					/\:/g,
-					""
-				)} [${glimt.id}].md`;
+				const filePath = `${
+					this.settings.folder
+				}/${glimt.title?.replace(/\:/g, "")} [${glimt.id}].md`;
 				const content = formatGlimtToMarkdown(glimt);
 
 				let file = this.app.vault.getAbstractFileByPath(filePath);
@@ -180,7 +195,8 @@ export default class MyPlugin extends Plugin {
 
 		await this.saveSettings();
 
-		new Notice("Glimts synced!");
+		new SuccessNotice("Glimts synced!");
+		isSyncingMessage.hide();
 	}
 
 	onunload() {}
@@ -204,13 +220,36 @@ export default class MyPlugin extends Plugin {
 				method: "GET",
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `${this.settings.apiKey}`,
+					Authorization: `${this.settings.token}`,
 				},
 			}
 		);
 
 		if (response.ok) {
 			return (await response.json()) as PodcastGlimt[];
+		} else {
+			throw new Error("Failed to fetch Glimts");
+		}
+	}
+
+	async verifyToken() {
+		const response = await fetch(
+			`${API_URL}/api/integrations/obsidian/auth`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `${this.settings.token}`,
+				},
+				body: JSON.stringify({
+					token: this.settings.token,
+				}),
+			}
+		);
+
+		if (response.ok) {
+			const body = (await response.json()) as any;
+			return body.success;
 		} else {
 			throw new Error("Failed to fetch Glimts");
 		}
@@ -254,9 +293,37 @@ class SampleSettingTab extends PluginSettingTab {
 			.addText((text) =>
 				text
 					.setPlaceholder("Enter your secret.")
-					.setValue(this.plugin.settings.apiKey)
+					.setValue(this.plugin.settings.token)
 					.onChange(async (value) => {
-						this.plugin.settings.apiKey = value;
+						this.plugin.settings.token = value;
+						await this.plugin.saveSettings();
+					})
+			)
+			.addButton((button) => {
+				button
+					.setButtonText("Connect")
+					.setCta()
+					.onClick(async () => {
+						try {
+							await this.plugin.verifyToken();
+							new SuccessNotice("Glimt Logged In!");
+						} catch (error) {
+							new ErrorNotice("Glimt Failed to Log In!");
+						}
+					});
+			});
+
+		new Setting(containerEl)
+			.setName("Sync Folder")
+			.setDesc(
+				"The folder to sync Glimt Bookmarks to. Will be created if it doesn't exist."
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("Enter the folder name.")
+					.setValue(this.plugin.settings.folder)
+					.onChange(async (value) => {
+						this.plugin.settings.folder = value;
 						await this.plugin.saveSettings();
 					})
 			);
@@ -281,6 +348,49 @@ class SampleSettingTab extends PluginSettingTab {
 						}
 					});
 			});
+	}
+}
+
+class SuccessNotice extends Notice {
+	constructor(message: string, icon: IconName = "check", duration = 5000) {
+		super(message, duration);
+
+		const iconEl = document.createElement("span");
+		setIcon(iconEl, icon);
+
+		this.messageEl.addClass("glimt-notice-message");
+		this.containerEl.addClass("glimt-success");
+		this.messageEl.appendChild(iconEl);
+	}
+}
+
+class ErrorNotice extends Notice {
+	constructor(message: string, icon: IconName = "ban", duration = 5000) {
+		super(message, duration);
+
+		const iconEl = document.createElement("span");
+		setIcon(iconEl, icon);
+
+		this.messageEl.addClass("glimt-notice-message");
+		this.containerEl.addClass("glimt-error");
+		this.messageEl.appendChild(iconEl);
+	}
+}
+
+class WarnNotice extends Notice {
+	constructor(
+		message: string,
+		icon: IconName = "file-warning",
+		duration = 5000
+	) {
+		super(message, duration);
+
+		const iconEl = document.createElement("span");
+		setIcon(iconEl, icon);
+
+		this.messageEl.addClass("glimt-notice-message");
+		this.containerEl.addClass("glimt-warn");
+		this.messageEl.appendChild(iconEl);
 	}
 }
 

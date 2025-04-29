@@ -9,3 +9,24 @@ If your plugin does not need CSS, delete this file.
 
 .my-plugin-ribbon-class {
 }
+
+.glimt-notice-message {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.glimt-error {
+	background-color: rgb(189, 72, 72);
+	color: rgb(37, 26, 21);
+}
+
+.glimt-success {
+	background-color: #f1d820;
+	color: #613f10;
+}
+
+.glimt-warn {
+	background-color: #d28d44;
+	color: #52340b;
+}
