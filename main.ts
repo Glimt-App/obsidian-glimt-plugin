@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: GlimtPluginSettings = {
 	cursor: 0,
 };
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://app.glimtapp.io";
 
 export default class MyPlugin extends Plugin {
 	settings: GlimtPluginSettings;
@@ -285,11 +285,9 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		new Setting(containerEl)
+		const s = new Setting(containerEl)
 			.setName("Secret Key")
-			.setDesc(
-				"Login to Glimt and get your secret key. Go to Integrations -> Obsidian Plugin."
-			)
+			.setDesc("Login to Glimt and get your secret key. ")
 			.addText((text) =>
 				text
 					.setPlaceholder("Enter your secret.")
@@ -312,6 +310,13 @@ class SampleSettingTab extends PluginSettingTab {
 						}
 					});
 			});
+
+		const a = document.createElement("a");
+		const br = document.createElement("br");
+		a.href = "https://app.glimtapp.io/integrations";
+		a.textContent = "glimtapp.io -> Integrations -> Obsidian Plugins";
+		s.descEl.appendChild(br);
+		s.descEl.appendChild(a);
 
 		new Setting(containerEl)
 			.setName("Sync Folder")
