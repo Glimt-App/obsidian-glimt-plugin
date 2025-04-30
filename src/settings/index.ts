@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
+import msFn, { StringValue } from "src/lib/time/ms";
 import type GlimtPlugin from "src/main";
 import { ErrorNotice, SuccessNotice } from "src/notice";
 
@@ -50,6 +51,10 @@ export class GlimtSettingsTab extends PluginSettingTab {
 		secretSetting.descEl.appendChild(br);
 		secretSetting.descEl.appendChild(a);
 
+		let intermediarySyncIntervalValue: StringValue = msFn(
+			this.plugin.settings.syncInterval
+		) as StringValue;
+
 		new Setting(containerEl)
 			.setName("Sync Folder")
 			.setDesc(
@@ -64,6 +69,53 @@ export class GlimtSettingsTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})
 			);
+
+		new Setting(containerEl)
+			.setName("Sync Interval")
+			.setDesc(
+				"How often to sync Glimt Bookmarks. example: 40sec, 5min, 1hour, 2days etc"
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("5min")
+					.setValue(intermediarySyncIntervalValue)
+					.onChange(async (value: StringValue) => {
+						intermediarySyncIntervalValue = value;
+					})
+			)
+			.addButton((button) => {
+				button
+					.setButtonText("Set Sync Interval")
+					.setCta()
+					.onClick(async () => {
+						try {
+							const newValue = msFn(
+								intermediarySyncIntervalValue
+							);
+
+							if (
+								newValue === this.plugin.settings.syncInterval
+							) {
+								return;
+							}
+
+							this.plugin.settings.syncInterval = newValue;
+							if (
+								typeof this.plugin.settings.syncInterval !==
+									"number" ||
+								isNaN(this.plugin.settings.syncInterval)
+							) {
+								throw new Error("Invalid value");
+							}
+							await this.plugin.saveSettings();
+							this.plugin.syncBackend();
+						} catch (error) {
+							new ErrorNotice(
+								"Invalid value, use 5min 1hour or something similar."
+							);
+						}
+					});
+			});
 
 		new Setting(containerEl)
 			.setName("Force Sync Glimts")
@@ -83,7 +135,8 @@ export class GlimtSettingsTab extends PluginSettingTab {
 						) {
 							await this.plugin.syncBackend({ force: true });
 						}
-					});
+					})
+					.buttonEl.addClass("force-sync-glimts-button");
 			});
 	}
 }

@@ -30,3 +30,8 @@ If your plugin does not need CSS, delete this file.
 	background-color: #d28d44;
 	color: #52340b;
 }
+
+.force-sync-glimts-button {
+	background-color: rgb(189, 72, 72) !important;
+	color: rgba(255, 255, 255, 0.9) !important;
+}

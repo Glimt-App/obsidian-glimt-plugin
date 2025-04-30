@@ -1,29 +1,23 @@
-import { addIcon, App, Modal, Notice, Plugin } from "obsidian";
+import { addIcon, Notice, Plugin } from "obsidian";
 import { GLIMT_ICON } from "src/icons";
 import { PodcastGlimt } from "src/types";
-import { SuccessNotice, WarnNotice } from "./notice";
-import { GlimtSettingsTab } from "./settings";
-import { formatTimeStampFromSeconds } from "./lib/time";
 import { API_URL } from "./constants";
+import { formatGlimtToMarkdown } from "./lib/documents";
+import { SuccessNotice, WarnNotice } from "./notice";
+import {
+	DEFAULT_SETTINGS,
+	GlimtPluginSettings,
+	GlimtSettingsTab,
+} from "./settings";
 
 // Remember to rename these classes and interfaces!
-
-interface GlimtPluginSettings {
-	folder: string;
-	token: string;
-	cursor: number;
-}
-
-const DEFAULT_SETTINGS: GlimtPluginSettings = {
-	folder: "Glimt",
-	token: "",
-	cursor: 0,
-};
 
 export default class GlimtPlugin extends Plugin {
 	settings: GlimtPluginSettings;
 
 	statusBarItemEl: HTMLElement;
+
+	syncTimer: NodeJS.Timeout;
 
 	async onload() {
 		addIcon("glimt-icon", GLIMT_ICON);
@@ -69,9 +63,9 @@ export default class GlimtPlugin extends Plugin {
 		this.addSettingTab(new GlimtSettingsTab(this.app, this));
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(
-			window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
-		);
+		// this.registerInterval(
+		// 	window.setInterval(() => console.log("setInterval"), 5 * 60 * 1000)
+		// );
 	}
 
 	async syncBackend({ force }: { force: boolean } = { force: false }) {
@@ -84,6 +78,10 @@ export default class GlimtPlugin extends Plugin {
 				10_000
 			);
 			return;
+		}
+
+		if (this.syncTimer) {
+			clearTimeout(this.syncTimer);
 		}
 
 		const isSyncingMessage = new Notice("Syncing Glimts");
@@ -150,9 +148,17 @@ export default class GlimtPlugin extends Plugin {
 
 		new SuccessNotice("Glimts synced!");
 		isSyncingMessage.hide();
+
+		this.syncTimer = setTimeout(() => {
+			this.syncBackend();
+		}, this.settings.syncInterval);
 	}
 
-	onunload() {}
+	onunload() {
+		if (this.syncTimer) {
+			clearTimeout(this.syncTimer);
+		}
+	}
 
 	async loadSettings() {
 		this.settings = Object.assign(
@@ -208,32 +214,3 @@ export default class GlimtPlugin extends Plugin {
 		}
 	}
 }
-
-const formatGlimtToMarkdown = (glimt: PodcastGlimt) => {
-	return (
-		`## ${glimt.punchline} \n\n` +
-		`**${glimt.summary}** \n\n` +
-		`${
-			glimt.personal_analysis
-				? `##### AI Personal Insight: \n\`\`\`${glimt.personal_analysis} \`\`\` \n\n`
-				: ""
-		}` +
-		`#### Transcript: \n` +
-		`> ${glimt.transcript} \n\n` +
-		`**${glimt.podcast_name}: ${glimt.podcast_episode_name}** \n` +
-		`	*at: ${formatTimeStampFromSeconds(glimt.timestamp ?? 0)}* \n\n` +
-		`#glimt #${cleanTag(glimt.podcast_name ?? "")} #${cleanTag(
-			glimt.podcast_episode_name ?? ""
-		)} \n\n` +
-		`[${API_URL}/glimt/${glimt.id}](${API_URL}/glimt/${glimt.id})\n\n\n\n` +
-		`**Warning:** *These documents should be considered __read only__ as syncing might overwrite them. Please copy them to another folder if you want to make edits.* \n\n`
-	);
-};
-
-const cleanTag = (tag: string) => {
-	return tag
-		.replace(/[^a-zA-Z0-9]/g, "")
-		.replace(/([A-Z])/g, "_$1")
-		.replace(/^_/, "")
-		.toLowerCase();
-};
