@@ -23,13 +23,9 @@ export default class GlimtPlugin extends Plugin {
 		addIcon("glimt-icon", GLIMT_ICON);
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon(
-			"glimt-icon",
-			"Glimt Sync",
-			(evt: MouseEvent) => {
-				this.syncBackend();
-			}
-		);
+		this.addRibbonIcon("glimt-icon", "Glimt Sync", (evt: MouseEvent) => {
+			this.syncBackend();
+		});
 
 		await this.loadSettings();
 		this.syncBackend();
