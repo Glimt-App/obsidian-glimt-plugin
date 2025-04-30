@@ -1,4 +1,4 @@
-import { addIcon, Notice, Plugin } from "obsidian";
+import { addIcon, Notice, Plugin, setIcon } from "obsidian";
 import { GLIMT_ICON } from "src/icons";
 import { PodcastGlimt } from "src/types";
 import { API_URL } from "./constants";
@@ -68,7 +68,11 @@ export default class GlimtPlugin extends Plugin {
 		// );
 	}
 
-	async syncBackend({ force }: { force: boolean } = { force: false }) {
+	async syncBackend(
+		{ force, silent }: { force?: boolean; silent?: boolean } = {
+			force: false,
+		}
+	) {
 		const apiKey = this.settings.token;
 
 		if (!apiKey) {
@@ -84,7 +88,7 @@ export default class GlimtPlugin extends Plugin {
 			clearTimeout(this.syncTimer);
 		}
 
-		const isSyncingMessage = new Notice("Syncing Glimts");
+		const isSyncingMessage = !silent ? new Notice("Syncing Glimts") : null;
 
 		const batchSize = 50;
 		const startCursor = force ? 0 : this.settings.cursor;
@@ -146,11 +150,12 @@ export default class GlimtPlugin extends Plugin {
 
 		await this.saveSettings();
 
-		new SuccessNotice("Glimts synced!");
-		isSyncingMessage.hide();
+		if (!silent) new SuccessNotice("Glimts synced!");
+
+		isSyncingMessage?.hide();
 
 		this.syncTimer = setTimeout(() => {
-			this.syncBackend();
+			this.syncBackend({ silent: true });
 		}, this.settings.syncInterval);
 	}
 
