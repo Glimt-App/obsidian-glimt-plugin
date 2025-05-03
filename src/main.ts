@@ -211,7 +211,8 @@ export default class GlimtPlugin extends Plugin {
 			const body = (await response.json()) as any;
 			return body.success;
 		} else {
-			throw new Error("Failed to log in");
+			const error = (await response.json()) as any;
+			throw new Error(error.message ?? "Failed to log in");
 		}
 	}
 }

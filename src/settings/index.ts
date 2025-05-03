@@ -39,7 +39,9 @@ export class GlimtSettingsTab extends PluginSettingTab {
 							await this.plugin.verifyToken();
 							new SuccessNotice("Glimt Logged In!");
 						} catch (error) {
-							new ErrorNotice("Glimt Failed to Log In!");
+							new ErrorNotice(
+								error.message ?? "Glimt Failed to Log In!"
+							);
 						}
 					});
 			});
