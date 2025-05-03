@@ -185,7 +185,7 @@ export default class GlimtPlugin extends Plugin {
 			}
 		);
 
-		if (response.ok) {
+		if (response.status === 200) {
 			return (await response.json()) as PodcastGlimt[];
 		} else {
 			throw new Error("Failed to fetch Glimts");
@@ -207,11 +207,11 @@ export default class GlimtPlugin extends Plugin {
 			}
 		);
 
-		if (response.ok) {
+		if (response.status === 200) {
 			const body = (await response.json()) as any;
 			return body.success;
 		} else {
-			throw new Error("Failed to fetch Glimts");
+			throw new Error("Failed to log in");
 		}
 	}
 }
