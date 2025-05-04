@@ -3,6 +3,8 @@ export interface GlimtPluginSettings {
 	token: string;
 	cursor: number;
 	syncInterval: number;
+	isPro: boolean;
+	connected: boolean;
 }
 
 export const DEFAULT_SETTINGS: GlimtPluginSettings = {
@@ -10,4 +12,6 @@ export const DEFAULT_SETTINGS: GlimtPluginSettings = {
 	token: "",
 	cursor: 0,
 	syncInterval: 1000 * 60 * 5, // 5 minutes
+	isPro: true,
+	connected: false,
 };

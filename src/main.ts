@@ -3,12 +3,13 @@ import { GLIMT_ICON } from "src/icons";
 import { PodcastGlimt } from "src/types";
 import { API_URL } from "./constants";
 import { formatGlimtToMarkdown } from "./lib/documents";
-import { SuccessNotice, WarnNotice } from "./notice";
+import { ErrorNotice, SuccessNotice, WarnNotice } from "./notice";
 import {
 	DEFAULT_SETTINGS,
 	GlimtPluginSettings,
 	GlimtSettingsTab,
 } from "./settings";
+import { fetchGlimts, isApiError } from "./api";
 
 // Remember to rename these classes and interfaces!
 
@@ -35,7 +36,7 @@ export default class GlimtPlugin extends Plugin {
 
 		this.addCommand({
 			id: "sync-glimts",
-			name: "Sync Glimt Bookmarks",
+			name: "Sync Bookmarks",
 			callback: async () => {
 				await this.syncBackend();
 			},
@@ -43,7 +44,7 @@ export default class GlimtPlugin extends Plugin {
 
 		this.addCommand({
 			id: "sync-glimts-force",
-			name: "Force - Sync Glimt Bookmarks",
+			name: "Force - Sync Bookmarks",
 			callback: async () => {
 				if (
 					confirm(
@@ -92,10 +93,33 @@ export default class GlimtPlugin extends Plugin {
 		let index = 0;
 
 		while (true) {
-			const glimts = await this.fetchGlimts({
+			const response = await fetchGlimts({
+				token: this.settings.token,
 				cursor: index === 0 ? startCursor : this.settings.cursor,
 				limit: batchSize,
 			});
+
+			if (isApiError(response)) {
+				this.settings.connected = false;
+
+				if (response.type === "NotCorrectPlanLevel") {
+					this.settings.isPro = false;
+				}
+
+				await this.saveSettings();
+
+				return new ErrorNotice(
+					`Glimt: ${response.message}`,
+					"file-warning",
+					10_000
+				);
+			} else {
+				this.settings.isPro = true;
+				this.settings.connected = true;
+				await this.saveSettings();
+			}
+
+			const glimts = response;
 
 			if (!glimts || glimts.length === 0) {
 				break;
@@ -106,7 +130,7 @@ export default class GlimtPlugin extends Plugin {
 			);
 
 			if (force && folder) {
-				await this.app.vault.delete(folder, force);
+				await this.app.fileManager.trashFile(folder);
 				folder = null;
 			}
 
@@ -120,10 +144,10 @@ export default class GlimtPlugin extends Plugin {
 				}/${glimt.title?.replace(/\:/g, "")} [${glimt.id}].md`;
 				const content = formatGlimtToMarkdown(glimt);
 
-				let file = this.app.vault.getAbstractFileByPath(filePath);
+				let file = this.app.vault.getFileByPath(filePath);
 
 				if (file && force) {
-					await this.app.vault.modify(file as any, content);
+					await this.app.vault.modify(file, content);
 				} else if (!file) {
 					await this.app.vault.create(filePath, content);
 				}
@@ -171,48 +195,5 @@ export default class GlimtPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-	}
-
-	async fetchGlimts({ cursor, limit }: { cursor: number; limit: number }) {
-		const response = await fetch(
-			`${API_URL}/api/integrations/obsidian/glimt?cursor=${cursor}&limit=${limit}`,
-			{
-				method: "GET",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `${this.settings.token}`,
-				},
-			}
-		);
-
-		if (response.status === 200) {
-			return (await response.json()) as PodcastGlimt[];
-		} else {
-			throw new Error("Failed to fetch Glimts");
-		}
-	}
-
-	async verifyToken() {
-		const response = await fetch(
-			`${API_URL}/api/integrations/obsidian/auth`,
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `${this.settings.token}`,
-				},
-				body: JSON.stringify({
-					token: this.settings.token,
-				}),
-			}
-		);
-
-		if (response.status === 200) {
-			const body = (await response.json()) as any;
-			return body.success;
-		} else {
-			const error = (await response.json()) as any;
-			throw new Error(error.message ?? "Failed to log in");
-		}
 	}
 }

@@ -1,4 +1,5 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, setIcon, Setting } from "obsidian";
+import { isApiError, verifyToken } from "src/api";
 import msFn, { StringValue } from "src/lib/time/ms";
 import type GlimtPlugin from "src/main";
 import { ErrorNotice, SuccessNotice } from "src/notice";
@@ -11,6 +12,39 @@ export class GlimtSettingsTab extends PluginSettingTab {
 	constructor(app: App, plugin: GlimtPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	upgradeSetting?: Setting;
+
+	displayUpgradeSetting() {
+		const { containerEl } = this;
+
+		if (this.upgradeSetting) {
+			this.upgradeSetting.settingEl.remove();
+		}
+
+		this.upgradeSetting = new Setting(containerEl)
+			.setName("Upgrade")
+			.setDesc(
+				"Glimt is a paid service and you need to have a paid plan to use this plugin."
+			)
+			.addButton((button) => {
+				const icon = document.createElement("span");
+				setIcon(icon, "sparkles");
+				button
+					.setButtonText("Go Pro")
+					.setCta()
+					.onClick(async () => {});
+				button.buttonEl.addClass("upgrade-button");
+				button.buttonEl.appendChild(icon);
+			});
+	}
+
+	removeUpgradeSetting() {
+		if (this.upgradeSetting) {
+			this.upgradeSetting.settingEl.remove();
+			this.upgradeSetting = undefined;
+		}
 	}
 
 	display(): void {
@@ -32,18 +66,50 @@ export class GlimtSettingsTab extends PluginSettingTab {
 			)
 			.addButton((button) => {
 				button
-					.setButtonText("Connect")
+					.setButtonText(
+						this.plugin.settings.connected ? "Connected" : "Connect"
+					)
 					.setCta()
 					.onClick(async () => {
-						try {
-							await this.plugin.verifyToken();
-							new SuccessNotice("Glimt Logged In!");
-						} catch (error) {
+						const response = await verifyToken(
+							this.plugin.settings.token
+						);
+
+						console.log(response, isApiError(response));
+
+						if (isApiError(response)) {
 							new ErrorNotice(
-								error.message ?? "Glimt Failed to Log In!"
+								response.message ?? "Glimt Failed to Log In!"
 							);
+
+							this.plugin.settings.connected = false;
+
+							if (response.type === "NotCorrectPlanLevel") {
+								this.displayUpgradeSetting();
+								this.plugin.settings.isPro = false;
+							} else {
+								this.removeUpgradeSetting();
+							}
+						} else {
+							new SuccessNotice("Glimt Logged In!");
+							this.plugin.settings.isPro = true;
+							this.removeUpgradeSetting();
+							this.plugin.settings.connected = true;
 						}
+
+						await this.plugin.saveSettings();
+						this.display();
 					});
+
+				button.buttonEl.addClass("connect-button");
+
+				const indicator = document.createElement("span");
+				const indicatorClass = this.plugin.settings.connected
+					? "connected"
+					: "disconnected";
+				indicator.classList.add("indicator");
+				indicator.classList.add(indicatorClass);
+				button.buttonEl.appendChild(indicator);
 			});
 
 		const a = document.createElement("a");
@@ -110,7 +176,8 @@ export class GlimtSettingsTab extends PluginSettingTab {
 								throw new Error("Invalid value");
 							}
 							await this.plugin.saveSettings();
-							this.plugin.syncBackend();
+							await this.plugin.syncBackend();
+							this.display();
 						} catch (error) {
 							new ErrorNotice(
 								"Invalid value, use 5min 1hour or something similar."
@@ -136,9 +203,16 @@ export class GlimtSettingsTab extends PluginSettingTab {
 							)
 						) {
 							await this.plugin.syncBackend({ force: true });
+							this.display();
 						}
 					})
 					.buttonEl.addClass("force-sync-glimts-button");
 			});
+
+		if (!this.plugin.settings.isPro) {
+			this.displayUpgradeSetting();
+		} else {
+			this.removeUpgradeSetting();
+		}
 	}
 }

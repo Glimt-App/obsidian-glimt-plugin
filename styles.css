@@ -35,3 +35,33 @@ If your plugin does not need CSS, delete this file.
 	background-color: rgb(189, 72, 72) !important;
 	color: rgba(255, 255, 255, 0.9) !important;
 }
+
+.upgrade-button {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background-color: rgba(0, 0, 0, 0.9) !important;
+	color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.connect-button {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background-color: rgba(0, 0, 0, 0.9) !important;
+	color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.connect-button .indicator {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: #00ff00;
+}
+
+.connect-button .indicator.disconnected {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: #ff0000;
+}
