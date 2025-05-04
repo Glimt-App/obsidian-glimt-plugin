@@ -47,7 +47,7 @@ export const verifyToken = async (token: string) => {
 			...error,
 			error: true,
 			status: response.status,
-		} satisfies ApiError;
+		} as ApiError;
 	}
 };
 
@@ -80,6 +80,6 @@ export const fetchGlimts = async ({
 			...error,
 			error: true,
 			status: response.status,
-		} satisfies ApiError;
+		} as ApiError;
 	}
 };
