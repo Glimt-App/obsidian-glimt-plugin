@@ -1,6 +1,6 @@
 # Glimt Obsidian Mirror Plugin
 
-This plugin is the plugin for the [https://www.glimtapp.io/](Glimt App). 
+This plugin is the plugin for the [glimtapp.io](https://www.glimtapp.io/). 
 
 Glimt lets you bookmark and save insights from podcast moments easily using screenshots, and the plugin
 syncs them to your Obsidian vault as markdown files.
@@ -14,7 +14,7 @@ syncs them to your Obsidian vault as markdown files.
 3. Search for "Glimt Obsidian Mirror"
 4. Click "Install"
 5. Once installed, enable the plugin
-6. Log into to [https://app.glimtapp.io/integrations](app.glimtapp.io/integrations)
+6. Log into to [app.glimtapp.io/integrations](https://app.glimtapp.io/integrations)
 7. Copy your access key.
 8. Enter the key on the Glimt plugin settings page in obsidian.
 
